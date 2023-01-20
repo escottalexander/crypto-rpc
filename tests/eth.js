@@ -6,7 +6,7 @@ const EthereumTx = require('ethereumjs-tx');
 const util = require('web3-utils');
 const config = {
   chain: 'ETH',
-  host: 'parity',
+  host: 'geth',
   protocol: 'http',
   port: '8545',
   rpcPort: '8545',
@@ -28,7 +28,7 @@ describe('ETH Tests', function() {
   const ethRPC = rpcs.get(currency);
   let txid = '';
   let blockHash = '';
-
+  const chainId = ethRPC.getChainId();
   this.timeout(10000);
 
   before(done => {
@@ -51,6 +51,7 @@ describe('ETH Tests', function() {
     const txData = {
       nonce: util.toHex(txCount),
       gasLimit: util.toHex(25000),
+      chainId,
       gasPrice: util.toHex(2.1*10e9),
       to: config.currencyConfig.sendTo,
       from: config.account,
@@ -73,6 +74,7 @@ describe('ETH Tests', function() {
       // construct the transaction data
       const txData = {
         nonce: util.toHex(null),
+        chainId,
         gasLimit: util.toHex(25000),
         gasPrice: util.toHex(2.1*10e9),
         to: config.currencyConfig.sendTo,
@@ -89,7 +91,7 @@ describe('ETH Tests', function() {
         rawTx: '0x' + serializedTx.toString('hex')
       });
     } catch(err) {
-      expect(err.message).to.include('Transaction nonce is too low');
+      expect(err.message).to.include('nonce too low');
     }
   });
 
@@ -103,7 +105,9 @@ describe('ETH Tests', function() {
     try {
       // construct the transaction data
       const txData = {
-        nonce: util.toHex(txCount),
+        // add to nonce so that the first tx isn't auto-mined before second tx is sent
+        nonce: util.toHex(txCount + 1),
+        chainId,
         gasLimit: util.toHex(25000),
         gasPrice: util.toHex(2.1*10e9),
         to: config.currencyConfig.sendTo,
@@ -133,7 +137,7 @@ describe('ETH Tests', function() {
   it('should estimate gas price', async () => {
     const gasPrice = await ethRPC.estimateGasPrice();
     assert.isDefined(gasPrice);
-    expect(gasPrice).to.be.eq(20600000000);
+    expect(gasPrice).to.be.gt(0);
   });
 
   it('should be able to get a block hash', async () => {
@@ -188,7 +192,8 @@ describe('ETH Tests', function() {
       amount: '10000',
       passphrase: currencyConfig.unlockPassword,
       gasPrice: 30000000000,
-      nonce: 25
+      nonce: 25,
+      chainId: 1337
     });
     let decodedParams = await rpcs.getTransaction({ txid });
     expect(decodedParams.nonce).to.equal(25);
